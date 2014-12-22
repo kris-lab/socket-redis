@@ -12,7 +12,7 @@ var sslKey = argv['ssl-key'];
 var sslCert = argv['ssl-cert'];
 var sslPfx = argv['ssl-pfx'];
 var sslPassphrase = argv['ssl-passphrase'];
-
+var pluginsPaths = argv['plugin-paths'];
 
 if (logDir) {
 	utils.logProcessInto(process, logDir + '/socket-redis.log');
@@ -43,6 +43,9 @@ if (!process.send) {
 		if (sslPassphrase) {
 			args.push('--ssl-passphrase=' + sslPassphrase);
 		}
+    if (pluginsPaths) {
+      args.push('--plugins-paths=' + pluginsPaths);
+    }
 		var startWorker = function() {
 			var worker = childProcess.fork(__filename, args);
 			console.log('Starting worker `' + worker.pid + '` to listen on port `' + socketPort + '`');
@@ -90,8 +93,18 @@ if (!process.send) {
 	if (sslOptions && sslPassphrase) {
 		sslOptions.passphrase = fs.readFileSync(sslPassphrase).toString().trim();
 	}
+
+  pluginManager = new socketRedis.PluginManager()
+
+  if(pluginsPaths) {
+    pluginsPaths.forEach(function(pluginPath) {
+      plugin = require(pluginPath)
+      pluginManager.register(new plugin)
+    });
+  }
+
 	var socketPort = argv['socket-port'];
-	var worker = new socketRedis.Worker(socketPort, sockjsClientUrl, sslOptions);
+	var worker = new socketRedis.Worker(socketPort, sockjsClientUrl, sslOptions, pluginManager);
 	process.on('message', function(event) {
 		worker.triggerEventDown(event.type, event.data);
 	});
